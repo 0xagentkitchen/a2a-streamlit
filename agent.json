@@ -1,0 +1,32 @@
+{
+    "name": "Fake Agent",
+    "description": "Does nothing, just a fake agent",
+    "url": "https://fake.com/agent",
+    "provider": {
+      "organization": "Fake Org",
+      "url": "https://fake.com"
+    },
+    "version": "1.0.0",
+    "authentication": {
+      "schemes": ["OAuth2"]
+    },
+    "defaultInputModes": ["text/plain"],
+    "defaultOutputModes": ["text/plain", "application/html"],
+    "capabilities": {
+      "streaming": true,
+      "pushNotifications": false
+    },
+    "skills": [
+      {
+        "id": "fake",
+        "name": "Faking",
+        "description": "Does nothing, just a fake agent",
+        "tags": ["fake"],
+        "examples": [
+          "Can you fake it?",
+          "I need a fake response"
+        ],
+        "outputModes": ["application/html"]
+      }
+    ]
+  }
