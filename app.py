@@ -126,46 +126,64 @@ if st.session_state.client:
                 message_placeholder = st.empty()
                 full_response = ""
 
-                # Check if we have streaming capability from the agent card
-                is_streaming = (st.session_state.agent_card and 
-                              st.session_state.agent_card.capabilities.streaming)
-                
-                is_streaming = False # Disable streaming for now
-                if is_streaming:
-                    # Handle streaming response
-                    async def process_stream(message_placeholder):
-                        response_stream = await st.session_state.client.send_task_streaming(payload)
+                # Add a spinner while waiting for the response
+                with st.spinner("Contacting AI Agent across galaxies..."):
+                    # Check if we have streaming capability from the agent card
+                    is_streaming = (st.session_state.agent_card and 
+                                  st.session_state.agent_card.capabilities.streaming)
+                    
+                    is_streaming = False # Disable streaming for now
+                    if is_streaming:
+                        # Handle streaming response
+                        async def process_stream(message_placeholder):
+                            response_stream = await st.session_state.client.send_task_streaming(payload)
+                            full_response = ""
+                            async for result in response_stream:
+                                if result.result and result.result.artifacts:
+                                    for artifact in result.result.artifacts:
+                                        for part in artifact.parts:
+                                            if part.type == "text":
+                                                full_response += part.text
+                                                message_placeholder.write(full_response)
+                            return full_response
+
+                        full_response = asyncio.run(process_stream(message_placeholder))
+                    else:
+                        # Handle non-streaming response
+                        response = asyncio.run(st.session_state.client.send_task(payload))
+                        print("---------------- Response ----------------")
+                        print("Result:", response.result)
+                        print(response)
+                        print("---------------- /Response ----------------")
+
                         full_response = ""
-                        async for result in response_stream:
-                            if result.result and result.result.artifacts:
-                                for artifact in result.result.artifacts:
-                                    for part in artifact.parts:
-                                        if part.type == "text":
-                                            full_response += part.text
-                                            message_placeholder.write(full_response)
-                        return full_response
 
-                    full_response = asyncio.run(process_stream(message_placeholder))
-                else:
-                    # Handle non-streaming response
-                    response = asyncio.run(st.session_state.client.send_task(payload))
-                    print("---------------- Response ----------------")
-                    print("Result:", response.result)
-                    print(response)
-                    print("---------------- /Response ----------------")
-                    if response.result and response.result.artifacts:
-                        for artifact in response.result.artifacts:
-                            for part in artifact.parts:
-                                if part.type == "text":
-                                    full_response += part.text
-                        message_placeholder.write(full_response)
+                        # Check if the response has a message in the INPUT_REQUIRED state
+                        if response.result and response.result.status.state == TaskState.INPUT_REQUIRED:
+                            if response.result.status.message and response.result.status.message.parts:
+                                for part in response.result.status.message.parts:
+                                    if part.type == "text":
+                                        full_response += part.text
+                                message_placeholder.write(full_response)
 
-                # Add agent response to chat history
-                if full_response:
-                    st.session_state.messages.append({
-                        "role": "agent",
-                        "content": full_response
-                    })
+                        # Check if the response is in the COMPLETED state and has artifacts
+                        elif response.result and response.result.status.state == TaskState.COMPLETED:
+                            if response.result.artifacts:
+                                for artifact in response.result.artifacts:
+                                    if artifact.parts:
+                                        for part in artifact.parts:
+                                            if part.type == "text":
+                                                # Split the text by line breaks and write each line separately
+                                                for line in part.text.split("\n"):
+                                                    full_response += line + "\n"
+                                                    message_placeholder.write(line)
+
+                        # Add agent response to chat history
+                        if full_response:
+                            st.session_state.messages.append({
+                                "role": "agent",
+                                "content": full_response
+                            })
 
         except Exception as e:
             st.error(f"Error communicating with agent: {str(e)}")
